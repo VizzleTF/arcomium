@@ -1516,7 +1516,10 @@ Arc's Change Icon... and Change Space Icon... open its picker, built after Arc f
 
 - **Logo menu** (Windows, Linux; `alerse_app_menu.cc`): Check for Updates (or
   "Update to Alerse X.Y.Z"), Import from Another Browser..., new tab, window and
-  incognito window, Spaces, Tabs, Extensions and Developer submenus, Downloads,
+  incognito window, Spaces, Tabs, Extensions and Developer submenus (Developer ends with
+  the Beta Updates check item, `alerse.update_check.beta` in Local State; not on macOS,
+  which takes pre-releases always; changing it clears what the last check found and
+  checks again in 10 seconds), Downloads,
   History, Bookmarks, Sync, Search Engine, Link routing, Settings, Print, About, More...
   (Chromium's full menu) and Close Window. As macOS' menu bar has them, the Spaces
   submenu lists the window's Spaces after Next and Previous Space (the shown one

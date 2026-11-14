@@ -11,6 +11,7 @@
 #include <string_view>
 
 #include "base/memory/raw_ptr.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "base/version.h"
@@ -34,11 +35,23 @@ inline constexpr char kUpdateCheckLastTime[] =
     "arcomium.update_check.last_time";
 // The latest release that answer named, as MAJOR.MINOR.PATCH.
 inline constexpr char kUpdateCheckLatest[] = "arcomium.update_check.latest";
+// The beta channel: pre-releases count as updates too. Off by default; macOS
+// always counts them while all its releases are pre-releases.
+inline constexpr char kUpdateCheckBeta[] = "alerse.update_check.beta";
 
 void RegisterUpdateCheckPrefs(PrefRegistrySimple* registry);
 
-// The page of this platform's latest release.
+// The page of this platform's latest release: its release list on the beta
+// channel, where "latest" would skip pre-releases.
 GURL GetLatestReleaseUrl();
+GURL GetLatestReleaseUrl(bool beta);
+
+// What the check asks GitHub's API for, after the repository: the newest of
+// the last releases when pre-releases count, else the latest release.
+std::string_view ReleasesPath(bool beta);
+
+// Whether this build counts pre-releases as updates.
+bool OnBetaChannel(const PrefService* local_state);
 
 // The page of this platform's release `version` (MAJOR.MINOR.PATCH).
 GURL GetReleaseUrl(std::string_view version);
@@ -84,11 +97,14 @@ class UpdateChecker : public ChromeBrowserMainExtraParts {
 
  private:
   void ScheduleCheck(base::TimeDelta delay);
+  // The channel or the switch changed: forget what was found and look again.
+  void OnSettingChanged();
   void Check();
   void OnResponse(std::optional<std::string> body);
 
   raw_ptr<PrefService> local_state_ = nullptr;
   base::OneShotTimer timer_;
+  PrefChangeRegistrar settings_;
   std::unique_ptr<network::SimpleURLLoader> loader_;
 };
 

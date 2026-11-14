@@ -13,6 +13,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/sequenced_task_runner.h"
+#include "build/build_config.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/alerse_update/alerse_update_checker.h"
@@ -27,6 +28,7 @@
 #include "chrome/browser/ui/views/tabs/vertical/alerse_popover.h"
 #include "chrome/browser/ui/views/tabs/vertical/alerse_space_switcher.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/accelerators/accelerator.h"
@@ -52,6 +54,7 @@ enum Command {
   kNextSpace,
   kPreviousSpace,
   kMore,
+  kBetaUpdates,
   // The Spaces submenu's Spaces, as macOS' Spaces menu lists them.
   kSpaceFirst = 100,
   kSpaceLast = 199,
@@ -203,6 +206,12 @@ class AppMenu : public ui::SimpleMenuModel::Delegate {
                        l10n_util::GetStringUTF16(IDS_ALERSE_MENU_CONSOLE));
     developer_.AddItem(IDC_TASK_MANAGER_MAIN_MENU,
                        l10n_util::GetStringUTF16(IDS_ALERSE_MENU_TASK_MANAGER));
+#if !BUILDFLAG(IS_MAC)
+    // macOS takes its pre-releases always (alerse_update_checker.h).
+    developer_.AddSeparator(ui::NORMAL_SEPARATOR);
+    developer_.AddCheckItem(
+        kBetaUpdates, l10n_util::GetStringUTF16(IDS_ALERSE_MENU_BETA_UPDATES));
+#endif
     root_.AddSubMenu(0, l10n_util::GetStringUTF16(IDS_ALERSE_MENU_DEVELOPER),
                      &developer_);
     root_.AddSeparator(ui::NORMAL_SEPARATOR);
@@ -238,6 +247,9 @@ class AppMenu : public ui::SimpleMenuModel::Delegate {
 
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdChecked(int command_id) const override {
+    if (command_id == kBetaUpdates) {
+      return OnBetaChannel(g_browser_process->local_state());
+    }
     return command_id == checked_space_;
   }
 
@@ -256,6 +268,7 @@ class AppMenu : public ui::SimpleMenuModel::Delegate {
       case kCheckForUpdates:
       case kNewSpace:
       case kMore:
+      case kBetaUpdates:
         return true;
       case kNextSpace:
       case kPreviousSpace: {
@@ -302,6 +315,13 @@ class AppMenu : public ui::SimpleMenuModel::Delegate {
         return;
       case kNewSpace:
         AlerseSpaceSwitcher::CreateSpace(browser.get());
+        return;
+      case kBetaUpdates:
+        // The update checker sees the change and looks again.
+        if (PrefService* local_state = g_browser_process->local_state()) {
+          local_state->SetBoolean(
+              kUpdateCheckBeta, !local_state->GetBoolean(kUpdateCheckBeta));
+        }
         return;
       case kNextSpace:
       case kPreviousSpace:

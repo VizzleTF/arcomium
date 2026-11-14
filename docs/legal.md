@@ -117,7 +117,8 @@ says. It links the sync server's policy and terms.
 
 ## Open points
 
-- A contact address for privacy requests: the policy points to GitHub for now.
+- Privacy requests go to public GitHub issues in alerse-sync (owner decision, 2026-11-14);
+  the policy warns not to post personal data. An email address may replace it later.
 - System codecs instead of bundled ones (see Codecs).
 - Code signing: unsigned builds carry no legal risk, but signing ties a release to its
   publisher.

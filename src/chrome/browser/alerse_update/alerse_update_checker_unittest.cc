@@ -93,7 +93,11 @@ TEST(AlerseUpdateCheckerTest, ReleaseUrls) {
   constexpr std::string_view kReleases =
       "https://github.com/VizzleTF/alerse-linux/releases/";
 #endif
-  EXPECT_EQ(GetLatestReleaseUrl().spec(), std::string(kReleases) + "latest");
+  EXPECT_EQ(GetLatestReleaseUrl(false).spec(),
+            std::string(kReleases) + "latest");
+  // The beta channel lists every release: "latest" skips pre-releases.
+  EXPECT_EQ(GetLatestReleaseUrl(true).spec(),
+            std::string(kReleases).substr(0, kReleases.size() - 1));
   EXPECT_EQ(GetReleaseUrl("0.1.5").spec(),
             std::string(kReleases) + "tag/v0.1.5");
 }
@@ -119,6 +123,23 @@ TEST(AlerseUpdateCheckerTest, AvailableUpdate) {
   // Turning checks off hides what an earlier check found.
   local_state.SetBoolean(kUpdateCheckEnabled, false);
   EXPECT_EQ(GetAvailableUpdate(&local_state), "");
+}
+
+TEST(AlerseUpdateCheckerTest, BetaChannel) {
+  EXPECT_EQ(ReleasesPath(false), "/releases/latest");
+  EXPECT_EQ(ReleasesPath(true), "/releases?per_page=20");
+
+  TestingPrefServiceSimple local_state;
+  RegisterUpdateCheckPrefs(local_state.registry());
+#if BUILDFLAG(IS_MAC)
+  // Every macOS release is a pre-release for now.
+  EXPECT_TRUE(OnBetaChannel(&local_state));
+#else
+  EXPECT_FALSE(OnBetaChannel(&local_state));
+  EXPECT_FALSE(OnBetaChannel(nullptr));
+  local_state.SetBoolean(kUpdateCheckBeta, true);
+  EXPECT_TRUE(OnBetaChannel(&local_state));
+#endif
 }
 
 }  // namespace

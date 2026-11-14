@@ -48,16 +48,18 @@ constexpr char kRepository[] = "VizzleTF/alerse-mac";
 constexpr char kRepository[] = "VizzleTF/alerse-linux";
 #endif
 
-// What is asked of GitHub. macOS releases are all pre-releases while they
-// trail Windows' Chromium version, and "latest" never names a pre-release
-// (it answers 404 where there is nothing else), so there the newest of the
-// last releases is taken instead; elsewhere a pre-release is a trial build
-// and is not offered.
+// macOS releases are all pre-releases while they trail Windows' Chromium
+// version, and "latest" never names a pre-release (it answers 404 where there
+// is nothing else), so there the newest of the last releases is taken
+// always; elsewhere a pre-release is a beta, offered on the beta channel only.
 #if BUILDFLAG(IS_MAC)
-constexpr char kReleasesPath[] = "/releases?per_page=20";
+constexpr bool kAlwaysBeta = true;
 #else
-constexpr char kReleasesPath[] = "/releases/latest";
+constexpr bool kAlwaysBeta = false;
 #endif
+
+// A setting change waits this long, so flipping it back and forth asks once.
+constexpr base::TimeDelta kSettingChangeDelay = base::Seconds(10);
 
 // The first check waits for startup to settle; later ones come once a day. A
 // check that gets no answer (offline, rate-limited, a server error) is
@@ -76,10 +78,11 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
           sender: "Alerse update check"
           description:
             "Asks GitHub's API for the latest Alerse release of this "
-            "platform, to tell the user in the browser's menu when a newer "
-            "one is out."
+            "platform (with pre-releases on the beta channel), to tell the "
+            "user in the browser's menu when a newer one is out."
           trigger:
-            "A few minutes after the browser starts, then once a day."
+            "A few minutes after the browser starts, then once a day, and "
+            "seconds after the update channel changes."
           data:
             "None: a plain GET of a public URL, without cookies."
           destination: OTHER
@@ -118,11 +121,25 @@ void RegisterUpdateCheckPrefs(PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(kUpdateCheckEnabled, true);
   registry->RegisterTimePref(kUpdateCheckLastTime, base::Time());
   registry->RegisterStringPref(kUpdateCheckLatest, std::string());
+  registry->RegisterBooleanPref(kUpdateCheckBeta, false);
+}
+
+std::string_view ReleasesPath(bool beta) {
+  return beta ? "/releases?per_page=20" : "/releases/latest";
+}
+
+bool OnBetaChannel(const PrefService* local_state) {
+  return kAlwaysBeta ||
+         (local_state && local_state->GetBoolean(kUpdateCheckBeta));
 }
 
 GURL GetLatestReleaseUrl() {
-  return GURL(
-      base::StrCat({"https://github.com/", kRepository, "/releases/latest"}));
+  return GetLatestReleaseUrl(OnBetaChannel(g_browser_process->local_state()));
+}
+
+GURL GetLatestReleaseUrl(bool beta) {
+  return GURL(base::StrCat({"https://github.com/", kRepository,
+                            beta ? "/releases" : "/releases/latest"}));
 }
 
 GURL GetReleaseUrl(std::string_view version) {
@@ -207,7 +224,15 @@ void UpdateChecker::PostBrowserStart() {
     return;
   }
   local_state_ = g_browser_process->local_state();
-  if (!local_state_ || !local_state_->GetBoolean(kUpdateCheckEnabled)) {
+  if (!local_state_) {
+    return;
+  }
+  settings_.Init(local_state_);
+  for (const char* pref : {kUpdateCheckEnabled, kUpdateCheckBeta}) {
+    settings_.Add(pref, base::BindRepeating(&UpdateChecker::OnSettingChanged,
+                                            base::Unretained(this)));
+  }
+  if (!local_state_->GetBoolean(kUpdateCheckEnabled)) {
     return;
   }
   // Wait out the rest of the day since the last answer, if there is any.
@@ -223,7 +248,19 @@ void UpdateChecker::PostBrowserStart() {
 void UpdateChecker::PostMainMessageLoopRun() {
   timer_.Stop();
   loader_.reset();
+  settings_.RemoveAll();
   local_state_ = nullptr;
+}
+
+void UpdateChecker::OnSettingChanged() {
+  timer_.Stop();
+  loader_.reset();
+  // A beta found on the beta channel is no update on the stable one.
+  local_state_->ClearPref(kUpdateCheckLatest);
+  local_state_->ClearPref(kUpdateCheckLastTime);
+  if (local_state_->GetBoolean(kUpdateCheckEnabled)) {
+    ScheduleCheck(kSettingChangeDelay);
+  }
 }
 
 void UpdateChecker::ScheduleCheck(base::TimeDelta delay) {
@@ -242,7 +279,8 @@ void UpdateChecker::Check() {
   }
   auto request = std::make_unique<network::ResourceRequest>();
   request->url = GURL(base::StrCat(
-      {"https://api.github.com/repos/", kRepository, kReleasesPath}));
+      {"https://api.github.com/repos/", kRepository,
+       ReleasesPath(OnBetaChannel(local_state_))}));
   request->credentials_mode = network::mojom::CredentialsMode::kOmit;
   request->headers.SetHeader("Accept", "application/vnd.github+json");
   loader_ =

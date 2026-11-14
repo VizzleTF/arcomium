@@ -172,7 +172,7 @@ PAIRS = [
     ('>privacy policy</a>: what it keeps, why, for how long, and how to have it deleted.', '>политика конфиденциальности</a> (на английском): что он хранит, зачем, сколько и как это удалить. Он работает в Европейском союзе.'),
     ('<h2>Contact</h2>', '<h2>Контакты</h2>'),
     ("The site and the sync server are run by Alerse's maintainer, VizzleTF on GitHub. Privacy requests: ", 'Сайт и сервер синхронизации ведёт мейнтейнер Alerse, VizzleTF на GitHub. Запросы о данных: '),
-    ('>a private report</a> with "privacy" in its title.', '>приватный отчёт</a> со словом «privacy» в заголовке.'),
+    ('>an issue</a> with "privacy" in its title. Issues are public, so write no password or other personal data in it; the reply says how to prove the account is yours.', '>issue</a> со словом «privacy» в заголовке. Issues видны всем, поэтому не пишите в нём пароль и другие личные данные; в ответе будет сказано, как подтвердить, что аккаунт ваш.'),
     ("'Privacy — Alerse'", "'Приватность — Alerse'"),
     ("'What alerse.app and the Alerse sync server keep about you.'", "'Что сайт и сервер синхронизации Alerse хранят о вас.'"),
     # Terms page

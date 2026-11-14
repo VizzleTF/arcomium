@@ -225,7 +225,7 @@ def privacy():
   <h2>The sync server</h2>
   <p>sync.alerse.app has its own <a href="{SYNC_DOCS}/privacy.md">privacy policy</a>: what it keeps, why, for how long, and how to have it deleted.</p>
   <h2>Contact</h2>
-  <p>The site and the sync server are run by Alerse's maintainer, VizzleTF on GitHub. Privacy requests: <a href="https://github.com/VizzleTF/alerse-sync/security/advisories/new">a private report</a> with "privacy" in its title.</p>
+  <p>The site and the sync server are run by Alerse's maintainer, VizzleTF on GitHub. Privacy requests: <a href="https://github.com/VizzleTF/alerse-sync/issues/new">an issue</a> with "privacy" in its title. Issues are public, so write no password or other personal data in it; the reply says how to prove the account is yours.</p>
 </article>'''
     return page('privacy', 'Privacy — Alerse', 'What alerse.app and the Alerse sync server keep about you.', body)
 

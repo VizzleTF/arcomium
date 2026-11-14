@@ -98,6 +98,14 @@ gh release edit vX.Y.Z -R VizzleTF/alerse --notes-file notes-core.md   # later c
 alerse-ios is built from source only and has no releases (see
 [patching.md](patching.md#ios-patches)).
 
+## Beta releases
+
+A beta is a release marked as a pre-release (`gh release create ... --prerelease`) on
+the next patch version. Windows and Linux builds offer it only with Beta Updates checked
+in the Alerse menu's Developer submenu; the stable channel asks GitHub for
+`/releases/latest`, which skips pre-releases. Making a beta the stable release:
+`gh release edit vX.Y.Z -R VizzleTF/alerse-win --prerelease=false --latest`.
+
 ## Release notes
 
 - Open with the platform, the Chromium version and the build number, as in

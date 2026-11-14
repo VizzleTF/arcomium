@@ -174,7 +174,11 @@ Alerse has no updater. A few minutes after it starts, and then once a day, it
 asks GitHub's API for the platform's latest release: a plain GET of
 `api.github.com/repos/VizzleTF/alerse-<platform>/releases/latest`, without
 cookies. When the release is newer, the Alerse menu shows "Update to Alerse X.Y.Z", which opens the release's page; nothing
-is downloaded by itself. To turn the check off, quit Alerse and set
+is downloaded by itself.
+
+Beta releases are GitHub pre-releases. To be told about them too, check Developer,
+Beta Updates in the Alerse menu: the check then asks for `/releases?per_page=20` and takes
+the newest. On macOS every release is a pre-release for now, so it always does. To turn the check off, quit Alerse and set
 `"arcomium": {"update_check": {"enabled": false}}` (`arcomium` is Alerse's earlier
 name, kept in stored settings) in the `Local State` file of
 Alerse's user data folder (`%LOCALAPPDATA%\Alerse\User Data` on Windows).

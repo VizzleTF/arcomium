@@ -223,6 +223,9 @@
     <message name="IDS_ALERSE_MENU_TASK_MANAGER" desc="Menu of the sidebar logo: open the task manager.">
       Task Manager
     </message>
+    <message name="IDS_ALERSE_MENU_BETA_UPDATES" desc="Menu of the sidebar logo, Developer submenu: a check item; when checked, beta releases count as updates.">
+      Beta Updates
+    </message>
     <message name="IDS_ALERSE_MENU_SYNC" desc="Menu of the sidebar logo: open the sync settings.">
       Sync
     </message>
