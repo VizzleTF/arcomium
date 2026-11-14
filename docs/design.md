@@ -1758,13 +1758,17 @@ in Arc.
   page. Open as Tab gives the page to the window's tab strip with its history and
   state. Peek follows the window when it moves or resizes and closes with it.
 - **The Little window** is a small window of its own (560 x 720, centered at the top
-  of the screen the pointer is on, resizable) with the address and Open in Alerse.
+  of the screen the pointer is on, resizable) with the address and, as Arc's Little
+  Arc, an "Open in <Space>" button naming the page's Space and a caret listing every
+  Space (the page's first).
   New Little Window opens one on an empty page with the address focused: Ctrl+Alt+N on
   Windows and Linux (the logo menu has it while the switch is on), Option-Command-N
   and File > New Little Window on macOS. A link from another app opens in one when no
   link route matches it and the window it would go to has tabs (a browser starting
-  for the link opens it as a tab). Open in Alerse gives the page to the Space's last
-  active window, or opens it in the Space when it has none.
+  for the link opens it as a tab). Open in <Space> (Ctrl+O, Command-O on a Mac) gives the
+  page to the Space's last active window, or opens it in the Space when it has none.
+  Another Space from the caret (Ctrl+Alt+O, Command-Option-O) loads the page's address
+  there anew, since that Space has its own logins.
 - In both, a link the page opens in a new tab or window opens as a tab of the Space;
   the page has no tab helpers until it is a tab, so autofill, password saving,
   JavaScript dialogs and extensions' content scripts wait for Open as Tab.

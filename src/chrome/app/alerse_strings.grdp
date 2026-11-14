@@ -573,8 +573,11 @@
   <message name="IDS_ALERSE_PEEK_OPEN_AS_TAB" desc="Tooltip of the button in Peek, a page shown over the current page, that keeps the page as a tab.">
     Open as Tab
   </message>
-  <message name="IDS_ALERSE_LITTLE_WINDOW_OPEN_IN_ALERSE" desc="Tooltip of the button in the Little window that moves its page to a tab of the main window.">
-    Open in Alerse
+  <message name="IDS_ALERSE_LITTLE_WINDOW_OPEN_IN_SPACE" desc="Button in the Little window, as Arc's Little Arc: moves its page to a tab of the named Space.">
+    Open in <ph name="SPACE">$1<ex>Work</ex></ph>
+  </message>
+  <message name="IDS_ALERSE_LITTLE_WINDOW_OTHER_SPACE" desc="Tooltip and accessible name of the caret next to Open in Space in the Little window: lists the Spaces to open the page in.">
+    Open in Another Space
   </message>
   <message name="IDS_ALERSE_PEEK_ADDRESS" desc="Accessible name of the address field in Peek and in the Little window.">
     Address

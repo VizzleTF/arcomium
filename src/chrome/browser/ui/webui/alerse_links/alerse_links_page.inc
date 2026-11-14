@@ -40,8 +40,9 @@ inline constexpr char kAlerseLinksHtml[] = R"HTML(<!doctype html>
       <span><strong>Little window</strong>
         <span class="note">New Little Window (Ctrl+Alt+N, or Option-Command-N
           on a Mac) opens a small window for a quick look, and links from
-          other apps that no route below takes open in one. Open in Alerse
-          moves its page to a tab.</span></span>
+          other apps that no route below takes open in one. Open in your
+          Space (Ctrl+O) moves its page to a tab; the arrow next to it picks
+          another Space.</span></span>
     </label>
   </section>
 

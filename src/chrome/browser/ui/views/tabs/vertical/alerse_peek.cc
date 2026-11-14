@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 // Peek and the Little window (chrome/browser/ui/tabs/alerse_peek.h). Both
-// show a page in a panel: an address field, Open as Tab (Peek) or Open in
-// Alerse (Little window), and the page. Peek's panel floats over its
+// show a page in a panel: an address field, Open as Tab (Peek) or, as Arc's
+// Little Arc, Open in <Space> with a caret for the other Spaces (Little
+// window), and the page. Peek's panel floats over its
 // window's page on a dimmed backdrop; the Little window is a small window of
 // its own. Their pages are not tabs until they are opened as one: the tab
 // strip adopts the page with its history and state.
@@ -28,6 +29,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
+#include "chrome/browser/ui/tabs/alerse_space_registry.h"
 #include "chrome/browser/ui/tabs/alerse_spaces.h"
 #include "chrome/browser/ui/tabs/alerse_window_stack.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -63,11 +65,14 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/transform_util.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/strings/grit/ui_strings.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/button/image_button_factory.h"
+#include "ui/views/controls/button/md_text_button.h"
+#include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
 #include "ui/views/controls/webview/unhandled_keyboard_event_handler.h"
@@ -76,6 +81,7 @@
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
+#include "ui/views/vector_icons.h"
 #include "ui/views/widget/widget_observer.h"
 
 namespace alerse {
@@ -105,21 +111,27 @@ BrowserWindowInterface* NormalWindowOf(Profile* profile) {
 // The page and its header. The panel owns the page until it becomes a tab.
 class PeekPanel : public views::View,
                   public content::WebContentsDelegate,
-                  public views::TextfieldController {
+                  public views::TextfieldController,
+                  public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(PeekPanel, views::View)
 
  public:
   enum class Kind { kPeek, kLittleWindow };
 
+  using OpenInSpace = base::RepeatingCallback<void(const base::FilePath&)>;
+
   PeekPanel(Profile* profile,
             Kind kind,
             base::RepeatingClosure close,
             base::RepeatingClosure open,
+            OpenInSpace open_in_space,
             base::RepeatingClosure title_changed)
       : profile_(profile),
         peek_(kind == Kind::kPeek),
         close_(std::move(close)),
-        title_changed_(std::move(title_changed)) {
+        open_in_space_(std::move(open_in_space)),
+        title_changed_(std::move(title_changed)),
+        spaces_menu_(this) {
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
     if (kind == Kind::kPeek) {
@@ -142,15 +154,38 @@ class PeekPanel : public views::View,
         l10n_util::GetStringUTF16(IDS_ALERSE_PEEK_ADDRESS));
     layout->SetFlexForView(address_, 1);
 
-    auto open_button = views::CreateVectorImageButtonWithNativeTheme(
-        std::move(open), vector_icons::kOpenInNewFlippableIcon, 16);
-    open_button->SetPreferredSize(gfx::Size(kButtonSize, kButtonSize));
-    const std::u16string open_name = l10n_util::GetStringUTF16(
-        kind == Kind::kPeek ? IDS_ALERSE_PEEK_OPEN_AS_TAB
-                            : IDS_ALERSE_LITTLE_WINDOW_OPEN_IN_ALERSE);
-    open_button->SetTooltipText(open_name);
-    open_button->GetViewAccessibility().SetName(open_name);
-    header_->AddChildView(std::move(open_button));
+    if (kind == Kind::kPeek) {
+      auto open_button = views::CreateVectorImageButtonWithNativeTheme(
+          std::move(open), vector_icons::kOpenInNewFlippableIcon, 16);
+      open_button->SetPreferredSize(gfx::Size(kButtonSize, kButtonSize));
+      const std::u16string open_name =
+          l10n_util::GetStringUTF16(IDS_ALERSE_PEEK_OPEN_AS_TAB);
+      open_button->SetTooltipText(open_name);
+      open_button->GetViewAccessibility().SetName(open_name);
+      header_->AddChildView(std::move(open_button));
+    } else {
+      // Arc's Little Arc: "Open in <Space>", the Space the page belongs to,
+      // and a caret that lists the other Spaces.
+      auto open_button = std::make_unique<views::MdTextButton>(
+          base::BindRepeating(
+              [](base::RepeatingClosure open, const ui::Event&) { open.Run(); },
+              std::move(open)),
+          l10n_util::GetStringFUTF16(IDS_ALERSE_LITTLE_WINDOW_OPEN_IN_SPACE,
+                                     GetSpaceOfProfile(profile).name));
+      open_button->SetStyle(ui::ButtonStyle::kTonal);
+      header_->AddChildView(std::move(open_button));
+
+      auto caret = views::CreateVectorImageButtonWithNativeTheme(
+          base::BindRepeating(&PeekPanel::ShowSpacesMenu,
+                              base::Unretained(this)),
+          views::kArrowDropDownIcon, 16);
+      caret->SetPreferredSize(gfx::Size(kButtonSize, kButtonSize));
+      const std::u16string caret_name =
+          l10n_util::GetStringUTF16(IDS_ALERSE_LITTLE_WINDOW_OTHER_SPACE);
+      caret->SetTooltipText(caret_name);
+      caret->GetViewAccessibility().SetName(caret_name);
+      caret_ = header_->AddChildView(std::move(caret));
+    }
 
     // The Little window closes as any window does.
     if (kind == Kind::kPeek) {
@@ -191,6 +226,42 @@ class PeekPanel : public views::View,
     contents_->GetController().LoadURLWithParams(params);
     address_->SetText(DisplayUrl(url));
     web_view_->RequestFocus();
+  }
+
+  // The Spaces to open the page in, under the caret; the page's own first.
+  void ShowSpacesMenu() {
+    spaces_menu_.Clear();
+    spaces_.clear();
+    const base::FilePath own = profile_->GetOriginalProfile()->GetPath();
+    std::vector<SpaceInfo> spaces = ListSpaces();
+    std::ranges::stable_partition(
+        spaces, [&](const SpaceInfo& space) { return space.path == own; });
+    for (const SpaceInfo& space : spaces) {
+      spaces_menu_.AddItem(static_cast<int>(spaces_.size()), space.name);
+      spaces_.push_back(space.path);
+    }
+    views::View* anchor = caret_ ? caret_.get() : header_.get();
+    menu_runner_ = std::make_unique<views::MenuRunner>(
+        &spaces_menu_, views::MenuRunner::HAS_MNEMONICS);
+    menu_runner_->RunMenuAt(anchor->GetWidget(), nullptr,
+                            anchor->GetBoundsInScreen(),
+                            views::MenuAnchorPosition::kTopRight,
+                            ui::mojom::MenuSourceType::kNone);
+  }
+
+  // ui::SimpleMenuModel::Delegate:
+  void ExecuteCommand(int command_id, int event_flags) override {
+    if (command_id < 0 || static_cast<size_t>(command_id) >= spaces_.size()) {
+      return;
+    }
+    // Run once the menu is gone: opening closes this window.
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(open_in_space_, spaces_[command_id]));
+  }
+
+  // The page's address, for a Space that cannot adopt the page itself.
+  GURL Url() const {
+    return contents_ ? contents_->GetLastCommittedURL() : GURL();
   }
 
   void FocusAddress() {
@@ -317,7 +388,12 @@ class PeekPanel : public views::View,
   const raw_ptr<Profile> profile_;
   const bool peek_;
   base::RepeatingClosure close_;
+  OpenInSpace open_in_space_;
   base::RepeatingClosure title_changed_;
+  ui::SimpleMenuModel spaces_menu_;
+  std::vector<base::FilePath> spaces_;
+  std::unique_ptr<views::MenuRunner> menu_runner_;
+  raw_ptr<views::View> caret_ = nullptr;
   raw_ptr<views::View> header_ = nullptr;
   raw_ptr<views::Textfield> address_ = nullptr;
   raw_ptr<views::WebView> web_view_ = nullptr;
@@ -457,6 +533,8 @@ class PeekHost : public views::WidgetDelegate, public views::WidgetObserver {
         profile_, kind,
         base::BindRepeating(&PeekHost::Close, weak_factory_.GetWeakPtr()),
         base::BindRepeating(&PeekHost::OpenAsTab, weak_factory_.GetWeakPtr()),
+        base::BindRepeating(&PeekHost::OpenInSpace,
+                            weak_factory_.GetWeakPtr()),
         base::BindRepeating(&PeekHost::TitleChanged,
                             weak_factory_.GetWeakPtr()));
     panel_ = panel.get();
@@ -488,8 +566,14 @@ class PeekHost : public views::WidgetDelegate, public views::WidgetObserver {
     parent_observation_.Observe(browser_view->GetWidget());
 
     // Escape closes Peek wherever the focus is.
-    accelerator_target_ = std::make_unique<EscapeTarget>(
-        base::BindRepeating(&PeekHost::Close, weak_factory_.GetWeakPtr()));
+    accelerator_target_ = std::make_unique<KeyTarget>(base::BindRepeating(
+        [](base::WeakPtr<PeekHost> host, const ui::Accelerator&) {
+          if (host) {
+            host->Close();
+          }
+          return true;
+        },
+        weak_factory_.GetWeakPtr()));
     widget_->GetFocusManager()->RegisterAccelerator(
         ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE),
         ui::AcceleratorManager::kNormalPriority, accelerator_target_.get());
@@ -523,8 +607,32 @@ class PeekHost : public views::WidgetDelegate, public views::WidgetObserver {
                               size.width(), size.height());
     widget_->Init(std::move(params));
     own_observation_.Observe(widget_.get());
+
+    // Arc's keys: Command-O opens the page in its Space, Command-Option-O
+    // picks another (Ctrl on Windows and Linux).
+    // Unretained: the host outlives its widget, whose focus manager calls.
+    accelerator_target_ = std::make_unique<KeyTarget>(base::BindRepeating(
+        &PeekHost::OnLittleWindowKey, base::Unretained(this)));
+    for (int flags : {ui::EF_PLATFORM_ACCELERATOR,
+                      ui::EF_PLATFORM_ACCELERATOR | ui::EF_ALT_DOWN}) {
+      widget_->GetFocusManager()->RegisterAccelerator(
+          ui::Accelerator(ui::VKEY_O, flags),
+          ui::AcceleratorManager::kNormalPriority, accelerator_target_.get());
+    }
     widget_->Show();
     widget_->Activate();
+  }
+
+  bool OnLittleWindowKey(const ui::Accelerator& accelerator) {
+    if (!panel_) {
+      return false;
+    }
+    if (accelerator.IsAltDown()) {
+      panel_->ShowSpacesMenu();
+    } else {
+      OpenAsTab();
+    }
+    return true;
   }
 
   // A light rise and fade in, as the sidebar's popovers (alerse_motion.h).
@@ -591,19 +699,38 @@ class PeekHost : public views::WidgetDelegate, public views::WidgetObserver {
     Close();
   }
 
-  // Escape's handler in Peek's widget.
-  class EscapeTarget : public ui::AcceleratorTarget {
+  // The page goes to a tab of the Space in `path`: the page itself to its
+  // own Space; another Space, with its own logins, loads its address anew.
+  void OpenInSpace(const base::FilePath& path) {
+    if (!panel_) {
+      return;
+    }
+    if (path == profile_->GetOriginalProfile()->GetPath()) {
+      OpenAsTab();
+      return;
+    }
+    const GURL url = panel_->Url();
+    BrowserWindowInterface* from =
+        GetLastActiveBrowserWindowInterfaceWithAnyProfile();
+    if (!from || !url.is_valid()) {
+      return;
+    }
+    OpenUrlInSpace(from, path, url);
+    Close();
+  }
+
+  // The keys of Peek's and the Little window's widgets.
+  class KeyTarget : public ui::AcceleratorTarget {
    public:
-    explicit EscapeTarget(base::RepeatingClosure close)
-        : close_(std::move(close)) {}
+    using Handler = base::RepeatingCallback<bool(const ui::Accelerator&)>;
+    explicit KeyTarget(Handler handler) : handler_(std::move(handler)) {}
     bool AcceleratorPressed(const ui::Accelerator& accelerator) override {
-      close_.Run();
-      return true;
+      return handler_.Run(accelerator);
     }
     bool CanHandleAccelerators() const override { return true; }
 
    private:
-    base::RepeatingClosure close_;
+    Handler handler_;
   };
 
   const raw_ptr<Profile> profile_;
@@ -611,7 +738,7 @@ class PeekHost : public views::WidgetDelegate, public views::WidgetObserver {
   const raw_ptr<BrowserWindowInterface> browser_;
   raw_ptr<BrowserView> parent_view_ = nullptr;
   raw_ptr<PeekPanel> panel_ = nullptr;
-  std::unique_ptr<EscapeTarget> accelerator_target_;
+  std::unique_ptr<KeyTarget> accelerator_target_;
   std::unique_ptr<views::Widget> widget_;
   base::ScopedObservation<views::Widget, views::WidgetObserver>
       own_observation_{this};
